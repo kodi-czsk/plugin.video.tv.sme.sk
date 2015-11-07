@@ -1,5 +1,7 @@
-2014-10-25
+[B]2015-07-19 v1.0.2:[/B]
+ * Pridana moznost nastavit predvolenu kvalitu videa 
+[B]2014-10-25 v1.0.1:[/B]
  * Pridani statistik
 [B]2013-11-15 v1.0.0:[/B]
- - TV.SME.sk - first release
+ * TV.SME.sk - first release
 
