@@ -24,5 +24,6 @@
     <description lang="sk">
         Plugin pre prehrávenie videí z archívu tv.sme.sk
     </description>
+    <source>https://github.com/kodi-czsk/plugin.video.tv.sme.sk</source>
   </extension>
 </addon>
