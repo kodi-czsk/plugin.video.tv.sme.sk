@@ -1,12 +1,11 @@
 # -*- coding: utf-8 -*-
 import urllib2,urllib,re,os
 import xbmcplugin,xbmcgui,xbmcaddon
-__baseurl__ = 'http://tv.sme.sk'
-_UserAgent_ = 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-GB; rv:1.9.0.3) Gecko/2008092417 Firefox/3.0.3'
 import HTMLParser
 from stats import *
-from datetime import datetime,timedelta
 
+__baseurl__ = 'http://tv.sme.sk'
+__piano_d__ = '?piano_d=1'
 __addon__ = xbmcaddon.Addon('plugin.video.tv.sme.sk')
 __profile__ = xbmc.translatePath(__addon__.getAddonInfo('profile'))
 __settings__ = xbmcaddon.Addon(id='plugin.video.tv.sme.sk')
@@ -50,6 +49,20 @@ def addDir(name,url,mode,iconimage,desc):
 	ok=xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=True)
 	return ok
 
+def getDataFromUrl(url):
+	req = urllib2.Request(url)
+	req.add_header('User-Agent', 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-GB; rv:1.9.0.3) Gecko/2008092417 Firefox/3.0.3')
+	response = urllib2.urlopen(req)
+	data = response.read()
+	response.close()
+	return data
+
+def getHtmlFromUrl(url):
+	return getDataFromUrl(url).decode("windows-1250")
+
+def getXmlFromUrl(url):
+	return getDataFromUrl(url).decode("utf-8")
+
 def listCategories():
 	logDbg("listCategories()")
 	addDir(u'[B]Všetky videá[/B]',__baseurl__+'/hs/',3,icon,'')
@@ -59,30 +72,10 @@ def listCategories():
 	addDir(u'[B]Zoznam relácií (aktívne)[/B]',__baseurl__+'/relacie/',1,icon,'')
 	addDir(u'[B]Zoznam relácií (archív)[/B]',__baseurl__+'/relacie/',2,icon,'')
 
-def listActiveShows(url):
-	logDbg("listActiveShows()")
-	req = urllib2.Request(__baseurl__+'/relacie/')
-	req.add_header('User-Agent', _UserAgent_)
-	response = urllib2.urlopen(req)
-	httpdata = response.read().decode("windows-1250")
-	response.close()
-	match = re.compile(u'<h2 class="light">Aktívne</h2>(.+?)<h2 class="light">Archív</h2>', re.DOTALL).findall(httpdata)
-	if match:
-		items = re.compile('img src="(.*?)" alt=.+?<h2><a href="(.+?)">(.+?)</a></h2>', re.DOTALL).findall(match[0])
-		for img,link,name in items:
-			link = __baseurl__+link
-			addDir(name,link,3,img,'') #!!! doplnit desc
-	else:
-		logErr("List of TV shows not found!")
-
-def listArchiveShows(url):
-	logDbg("listArchiveShows()")
-	req = urllib2.Request(__baseurl__+'/relacie/')
-	req.add_header('User-Agent', _UserAgent_)
-	response = urllib2.urlopen(req)
-	httpdata = response.read().decode("windows-1250")
-	response.close()
-	match = re.compile(u'<h2 class="light">Archív</h2>(.+?)<div class="cb"></div></div>', re.DOTALL).findall(httpdata)
+def listShows(url,section):
+	logDbg("listShows("+section+")")
+	httpdata = getHtmlFromUrl(url)
+	match = re.compile(u'<h2 class="light">'+section+'</h2>(.+?)<div class="cb"></div></div>', re.DOTALL).findall(httpdata)
 	if match:
 		items = re.compile('img src="(.*?)" alt=.+?<h2><a href="(.+?)">(.+?)</a></h2>', re.DOTALL).findall(match[0])
 		for img,link,name in items:
@@ -93,11 +86,7 @@ def listArchiveShows(url):
 
 def listEpisodes(url):
 	logDbg("listEpisodes()")
-	req = urllib2.Request(url)
-	req.add_header('User-Agent', _UserAgent_)
-	response = urllib2.urlopen(req)
-	httpdata = response.read().decode("windows-1250")
-	response.close()
+	httpdata = getHtmlFromUrl(url)
 	match = re.compile('<div class="list">(.+?)<div id="otherartw" class="pages"', re.DOTALL).findall(httpdata)
 	if match:
 		items = re.compile('src="(.*?)" alt=.+?<h2>.*?<a href="(.+?)">(.+?)</a>.+?<div class="time">(.+?)</div>(.*?)</div>', re.DOTALL).findall(match[0])
@@ -126,13 +115,9 @@ def listEpisodes(url):
 		logErr("List of episodes not found!")
 
 def getVideoUrl(url):
-	logDbg("playVideoLink()")
+	logDbg("getVideoUrl()")
 	logDbg("\tPage url="+url)
-	req = urllib2.Request(url)
-	req.add_header('User-Agent', _UserAgent_)
-	response = urllib2.urlopen(req)
-	httpdata = response.read().decode("windows-1250")
-	response.close()
+	httpdata = getHtmlFromUrl(url)
 	match = re.compile('_fn\(t\)(.+?)</script>', re.DOTALL).findall(httpdata)
 	if match:
 		items = re.compile('var rev=(.+?);.+?"file", escape\("(.+?)"\+ rev \+"(.+?)"\)\);', re.DOTALL).findall(match[0])
@@ -140,12 +125,8 @@ def getVideoUrl(url):
 			rev,link1,link2 = items[0]
 			link = link1+str(rev)+link2
 			logDbg("\tPlaylist url="+link)
-			req = urllib2.Request(link)
-			req.add_header('User-Agent', _UserAgent_)
-			response = urllib2.urlopen(req)
-			httpdata = response.read().decode("utf-8")
-			response.close()
-			item = re.compile('<title>(.+?)</title>.+?<location>(.+?)</location>.+?<image>(.+?)</image>', re.DOTALL).findall(httpdata)
+			xmldata = getXmlFromUrl(link)
+			item = re.compile('<title>(.+?)</title>.+?<location>(.+?)</location>.+?<image>(.+?)</image>', re.DOTALL).findall(xmldata)
 			if item:
 				title, link, img = item[0]
 				logDbg("\tVideo url="+link)
@@ -164,11 +145,7 @@ def playEpisode(url1):
 	logDbg("\tVideo quality: "+str(video_quality))
 	url1_is_hd = False
 	url2 = ''
-	req = urllib2.Request(url1)
-	req.add_header('User-Agent', _UserAgent_)
-	response = urllib2.urlopen(req)
-	httpdata = response.read().decode("windows-1250")
-	response.close()
+	httpdata = getHtmlFromUrl(url1+__piano_d__)
 	match = re.compile('<div class="v-podcast-box js-v-podcast-box">(.+?)<div class="(?:v-clanok|v-perex)">', re.DOTALL).findall(httpdata)
 	if match:
 		items = re.compile('</label><a href="(.+?)" class="hd-btn(.+?)"></a>', re.DOTALL).findall(match[0])
@@ -209,7 +186,7 @@ def playEpisode(url1):
 			url=url_hd
 	else:
 		url=url1
-	url=getVideoUrl(url)
+	url=getVideoUrl(url+__piano_d__)
 	liz = xbmcgui.ListItem(path=url, iconImage="DefaultVideo.png")
 	liz.setInfo( type="Video", infoLabels={ "Title": name, "Plot": desc} )
 	liz.setProperty('IsPlayable', "true")
@@ -268,11 +245,11 @@ if mode==None or url==None or len(url)<1:
 	
 elif mode==1:
 	STATS("listActiveShows", "Function")
-	listActiveShows(url)
+	listShows(url,u'Aktívne')
 
 elif mode==2:
 	STATS("listArchiveShows", "Function")
-	listArchiveShows(url)
+	listShows(url,u'Archív')
 
 elif mode==3:
 	STATS("listEpisodes", "Function")
