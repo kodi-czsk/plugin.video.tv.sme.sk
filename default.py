@@ -7,12 +7,10 @@ from stats import *
 __baseurl__ = 'http://tv.sme.sk'
 __piano_d__ = '?piano_d=1'
 __addon__ = xbmcaddon.Addon('plugin.video.tv.sme.sk')
-__profile__ = xbmc.translatePath(__addon__.getAddonInfo('profile'))
-__settings__ = xbmcaddon.Addon(id='plugin.video.tv.sme.sk')
-__cwd__ = __settings__.getAddonInfo('path')
+__cwd__ = xbmc.translatePath(__addon__.getAddonInfo('path')).decode("utf-8")
 __scriptname__ = __addon__.getAddonInfo('name')
-icon = xbmc.translatePath( os.path.join( __cwd__, 'icon.png' ) )
-nexticon = xbmc.translatePath( os.path.join( __cwd__, 'nextpage.png' ) )
+icon =  os.path.join( __cwd__, 'icon.png' )
+nexticon = os.path.join( __cwd__, 'nextpage.png' )
 video_quality = int(__addon__.getSetting('quality'))
 
 VQ_SELECT = 0
@@ -252,7 +250,8 @@ elif mode==2:
 	listShows(url,u'Archív')
 
 elif mode==3:
-	STATS("listEpisodes", "Function")
+	category='/'.join(url.split('/')[-2:])
+	STATS("listEpisodes "+category, "Function")
 	listEpisodes(url)
 
 elif mode==5:
