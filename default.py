@@ -11,11 +11,6 @@ __cwd__ = xbmc.translatePath(__addon__.getAddonInfo('path')).decode("utf-8")
 __scriptname__ = __addon__.getAddonInfo('name')
 icon =  os.path.join( __cwd__, 'icon.png' )
 nexticon = os.path.join( __cwd__, 'nextpage.png' )
-video_quality = int(__addon__.getSetting('quality'))
-
-VQ_SELECT = 0
-VQ_SD = 1
-VQ_HD = 2
 
 def log(msg, level=xbmc.LOGDEBUG):
 	if type(msg).__name__=='unicode':
@@ -116,79 +111,39 @@ def getVideoUrl(url):
 	logDbg("getVideoUrl()")
 	logDbg("\tPage url="+url)
 	httpdata = getHtmlFromUrl(url)
-	match = re.compile('_fn\(t\)(.+?)</script>', re.DOTALL).findall(httpdata)
+	match = re.compile(r'playerElement_id([0-9]+)', re.DOTALL).findall(httpdata)
 	if match:
-		items = re.compile('var rev=(.+?);.+?"file", escape\("(.+?)"\+ rev \+"(.+?)"\)\);', re.DOTALL).findall(match[0])
-		if items:
-			rev,link1,link2 = items[0]
-			link = link1+str(rev)+link2
-			logDbg("\tPlaylist url="+link)
-			xmldata = getXmlFromUrl(link)
-			item = re.compile('<title>(.+?)</title>.+?<location>(.+?)</location>.+?<image>(.+?)</image>', re.DOTALL).findall(xmldata)
-			if item:
-				title, link, img = item[0]
-				logDbg("\tVideo url="+link)
-				return link
-			else:
-				logErr("Video location not found!")
+		video_id = match[0]
+		xmldata = getXmlFromUrl(__baseurl__+'/storm-sme-crd/mmdata_get.asp?vp=2&id={0}'.format(video_id))
+		item = re.compile('<title>(.+?)</title>.+?<location>(.+?)</location>.+?<image>(.+?)</image>', re.DOTALL).findall(xmldata)
+		if item:
+			title, link, img = item[0]
+			logDbg("\tVideo url from xml="+link)
+			return link
 		else:
-			logErr("Video informations not found!")
+			logErr("Video location not found!")
 	else:
-		logErr("Player script not found!")
+		logDbg("PlayerElementID not found!")
+
+	match = re.compile(r'content="https://i.sme.sk/(datamm[^"]+)', re.DOTALL).findall(httpdata)
+	if match:
+		video_file = re.sub(r'-[0-9]+\.jpg$', '.mp4', match[0])
+		link = 'https://v.sme.sk/' + video_file
+		logDbg("\tVideo url="+link)
+		return link
+	else:
+		logErr("Video url not found!")
 	return None
 
-def playEpisode(url1):
+def playEpisode(url):
 	logDbg("playEpisode()")
-	logDbg("\turl="+url1)
-	logDbg("\tVideo quality: "+str(video_quality))
-	url1_is_hd = False
-	url2 = ''
-	httpdata = getHtmlFromUrl(url1+__piano_d__)
-	match = re.compile('<div class="v-podcast-box js-v-podcast-box">(.+?)<div class="(?:v-clanok|v-perex)">', re.DOTALL).findall(httpdata)
-	if match:
-		items = re.compile('</label><a href="(.+?)" class="hd-btn(.+?)"></a>', re.DOTALL).findall(match[0])
-		if items:
-			url2, hd_btn_off = items[0]
-			url2 = __baseurl__ + url2
-			if len(hd_btn_off) == 0:
-				url1_is_hd = True
-		else:
-			logDbg("Alternative video quality not found.")
-	else:
-		logErr("podcast-box not found!")
-	
-	if len(url2):
-		if url1_is_hd:
-			url_sd=url2
-			url_hd=url1
-		else:
-			url_sd=url1
-			url_hd=url2
-		logDbg("\tHD URL: "+url_hd)
-		logDbg("\tSD URL: "+url_sd)
-		if video_quality == VQ_SELECT:
-			dialog = xbmcgui.Dialog()
-			opts = ['HD', 'SD']
-			ret = dialog.select('Vyber si kvalitu', opts)
-			if ret < 0:
-				logDbg("Quality not selected")
-				return
-			logDbg("Selected quality: " + str(ret))
-			if ret == 0:
-				url=url_hd
-			else:
-				url=url_sd
-		elif video_quality == VQ_SD:
-			url=url_sd
-		else:
-			url=url_hd
-	else:
-		url=url1
+	logDbg("\tur="+url)
 	url=getVideoUrl(url+__piano_d__)
-	liz = xbmcgui.ListItem(path=url, iconImage="DefaultVideo.png")
-	liz.setInfo( type="Video", infoLabels={ "Title": name, "Plot": desc} )
-	liz.setProperty('IsPlayable', "true")
-	xbmcplugin.setResolvedUrl(handle=int(sys.argv[1]), succeeded=(url!=None), listitem=liz)
+	if url:
+		liz = xbmcgui.ListItem(path=url, iconImage="DefaultVideo.png")
+		liz.setInfo( type="Video", infoLabels={ "Title": name, "Plot": desc} )
+		liz.setProperty('IsPlayable', "true")
+		xbmcplugin.setResolvedUrl(handle=int(sys.argv[1]), succeeded=(url!=None), listitem=liz)
 	return
 
 def get_params():
