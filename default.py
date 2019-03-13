@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
 import urllib2,urllib,re,os
 import xbmcplugin,xbmcgui,xbmcaddon
-import HTMLParser
-from stats import *
+import datetime
+import time
 
-__baseurl__ = 'http://tv.sme.sk'
-__piano_d__ = '?piano_d=1'
+__baseurl__ = 'https://video.sme.sk'
 __addon__ = xbmcaddon.Addon('plugin.video.tv.sme.sk')
 __cwd__ = xbmc.translatePath(__addon__.getAddonInfo('path')).decode("utf-8")
 __scriptname__ = __addon__.getAddonInfo('name')
@@ -23,12 +22,12 @@ def logDbg(msg):
 def logErr(msg):
 	log(msg,level=xbmc.LOGERROR)
 
-def addLink(name,url,mode,iconimage,desc):
-	logDbg("addLink(): '"+name+"' url='"+url+ "' img='"+iconimage+"' desc='"+desc+"'")
+def addLink(name,url,mode,iconimage,desc,duration):
+	logDbg("addLink(): '"+name+"' url='"+url+ "' img='"+iconimage+"' desc='"+desc+"' dur='"+duration+"")
 	u=sys.argv[0]+"?url="+urllib.quote_plus(url.encode('utf-8'))+"&mode="+str(mode)+"&name="+urllib.quote_plus(name.encode('utf-8'))+"&desc="+urllib.quote_plus(desc.encode('utf-8'))
 	ok=True
 	liz=xbmcgui.ListItem(name, iconImage="DefaultVideo.png", thumbnailImage=iconimage)
-	liz.setInfo( type="Video", infoLabels={ "Title": name, "Plot": desc} )
+	liz.setInfo( type="Video", infoLabels={ "Title": name, "Plot": desc, "Duration": duration} )
 	liz.setProperty("IsPlayable", "true")
 	ok=xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=False)
 	return ok
@@ -42,6 +41,10 @@ def addDir(name,url,mode,iconimage,desc):
 	ok=xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=True)
 	return ok
 
+def getDuration(durstr):
+	x = time.strptime(durstr,'%M:%S')
+	return str(datetime.timedelta(hours=x.tm_hour,minutes=x.tm_min,seconds=x.tm_sec).total_seconds())
+
 def getDataFromUrl(url):
 	req = urllib2.Request(url)
 	req.add_header('User-Agent', 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-GB; rv:1.9.0.3) Gecko/2008092417 Firefox/3.0.3')
@@ -51,94 +54,60 @@ def getDataFromUrl(url):
 	return data
 
 def getHtmlFromUrl(url):
-	return getDataFromUrl(url).decode("windows-1250")
+	return getDataFromUrl(url).decode("utf-8")
 
 def getXmlFromUrl(url):
 	return getDataFromUrl(url).decode("utf-8")
 
 def listCategories():
 	logDbg("listCategories()")
-	addDir(u'[B]Všetky videá[/B]',__baseurl__+'/hs/',3,icon,'')
-	addDir(u'[B]Spravodajské[/B]',__baseurl__+'/vr/118/spravodajske/',3,icon,'')
-	addDir(u'[B]Publicistické[/B]',__baseurl__+'/vr/117/publicisticke/',3,icon,'')
-	addDir(u'[B]Zábavné[/B]',__baseurl__+'/vr/119/zabavne/',3,icon,'')
-	addDir(u'[B]Zoznam relácií (aktívne)[/B]',__baseurl__+'/relacie/',1,icon,'')
-	addDir(u'[B]Zoznam relácií (archív)[/B]',__baseurl__+'/relacie/',2,icon,'')
-
-def listShows(url,section):
-	logDbg("listShows("+section+")")
-	httpdata = getHtmlFromUrl(url)
-	match = re.compile(u'<h2 class="light">'+section+'</h2>(.+?)<div class="cb"></div></div>', re.DOTALL).findall(httpdata)
-	if match:
-		items = re.compile('img src="(.*?)" alt=.+?<h2><a href="(.+?)">(.+?)</a></h2>', re.DOTALL).findall(match[0])
-		for img,link,name in items:
-			link = __baseurl__+link
-			addDir(name,link,3,img,'')
-	else:
-		logErr("List of TV shows not found!")
+#	addDir(u'[B]Všetky videá[/B]',__baseurl__+'/hs/',3,icon,'')
+	addDir(u'[B]Spravodajstvo[/B]','/r/7026/spravodajstvo.html',3,icon,'')
+	addDir(u'[B]Publicisticka[/B]','/r/7028/publicistika.html',3,icon,'')
+	addDir(u'[B]Zábava[/B]','/r/7031/zabava.html',3,icon,'')
+#	addDir(u'[B]Zoznam relácií (aktívne)[/B]',__baseurl__+'/relacie/',1,icon,'')
+#	addDir(u'[B]Zoznam relácií (archív)[/B]',__baseurl__+'/relacie/',2,icon,'')
 
 def listEpisodes(url):
 	logDbg("listEpisodes()")
-	httpdata = getHtmlFromUrl(url)
-	match = re.compile('<div class="list">(.+?)<div id="otherartw" class="pages"', re.DOTALL).findall(httpdata)
-	if match:
-		items = re.compile('src="(.*?)" alt=.+?<h2>.*?<a href="(.+?)">(.+?)</a>.+?<div class="time">(.+?)</div>(.*?)</div>', re.DOTALL).findall(match[0])
-		for img,link,name,date,desc in items:
-			link = __baseurl__+link
-			# remove new lines
-			desc=desc.replace("\n", "")
-			if len(desc):
-				match = re.compile('<p>(.+?)</p>', re.DOTALL).findall(desc)
-				if match:
-					desc = match[0]
-					# remove optional <span>...</span> tag
-					if "<span" in desc:
-						match = re.compile('<span.*</span>(.*)', re.DOTALL).findall(desc)
-						if match:
-							desc = match[0]
-							logDbg("new desc: "+desc)
-			addLink('('+date+') '+name,link,5,img,desc)
-		items = re.compile('<div class="otherart r"><h5><a href="(.+?)">(.+?)</a>', re.DOTALL).findall(httpdata)
-		if items:
-			link, name = items[0]
-			link = __baseurl__+link
-			h = HTMLParser.HTMLParser()
-			addDir('[B]'+h.unescape(name)+'[/B]',link,3,nexticon,'')
+	
+	httpdata = getHtmlFromUrl(__baseurl__+url)
+
+	beg_idx=httpdata.find('class="video-row')
+	end_idx=httpdata.find('id="js-paging"')
+	data=httpdata[beg_idx:end_idx]
+	
+	pattern = re.compile('<a data-deep-tags=\"position-[0-9]+\" class=\"video-box-tile\".+?href=\"(.+?)\">.+?<img class=\"video-box-tile-img\" src=\"(.+?)\".+?>.+?<h2.*?>(.+?)</h2>.+?media-box-author(.+?)datetime=\"([0-9]{2}:[0-9]{2})\"', re.DOTALL)
+	it = re.finditer(pattern,data)
+	for item in it:
+		link,img,title,authors,duration = item.groups()
+		addLink(title.strip().replace('(video)',''),link,5,img,"",getDuration(duration))
+	nextlink=re.compile('<link rel=\"next\" href=\"(.+?)\">', re.DOTALL).search(httpdata)
+	if nextlink:
+		addDir(u'[B]Nasledujúce články[/B]',nextlink.group(1),3,nexticon,'')
 	else:
-		logErr("List of episodes not found!")
+		logDbg('No next page.') 
+	return None
 
 def getVideoUrl(url):
 	logDbg("getVideoUrl()")
 	logDbg("\tPage url="+url)
 	httpdata = getHtmlFromUrl(url)
-	match = re.compile(r'playerElement_id([0-9]+)', re.DOTALL).findall(httpdata)
+	match = re.compile(r'<iframe src=\"//www\.youtube\.com/embed/(.+?)\"', re.DOTALL).search(httpdata)
 	if match:
-		video_id = match[0]
-		xmldata = getXmlFromUrl(__baseurl__+'/storm-sme-crd/mmdata_get.asp?vp=2&id={0}'.format(video_id))
-		item = re.compile('<title>(.+?)</title>.+?<location>(.+?)</location>.+?<image>(.+?)</image>', re.DOTALL).findall(xmldata)
-		if item:
-			title, link, img = item[0]
-			logDbg("\tVideo url from xml="+link)
-			return link
+		return 'plugin://plugin.video.youtube/play/?video_id='+match.group(1)
+	else:
+		match = re.compile(r'<iframe src=\"//(.*?sme\.sk/vp/.+?)\"', re.DOTALL).search(httpdata)
+		if match:
+			return getVideoUrl('http://'+match.group(1))
 		else:
-			logErr("Video location not found!")
-	else:
-		logDbg("PlayerElementID not found!")
-
-	match = re.compile(r'content="https://i.sme.sk/(datamm[^"]+)', re.DOTALL).findall(httpdata)
-	if match:
-		video_file = re.sub(r'-[0-9]+\.jpg$', '.mp4', match[0])
-		link = 'https://v.sme.sk/' + video_file
-		logDbg("\tVideo url="+link)
-		return link
-	else:
-		logErr("Video url not found!")
+			logDbg("Iframe youtube not found!")
 	return None
 
 def playEpisode(url):
 	logDbg("playEpisode()")
 	logDbg("\tur="+url)
-	url=getVideoUrl(url+__piano_d__)
+	url=getVideoUrl(url)
 	if url:
 		liz = xbmcgui.ListItem(path=url, iconImage="DefaultVideo.png")
 		liz.setInfo( type="Video", infoLabels={ "Title": name, "Plot": desc} )
@@ -191,27 +160,14 @@ logDbg("URL: "+str(url))
 logDbg("Name: "+str(name))
 logDbg("Desc: "+str(desc))
 
-
 if mode==None or url==None or len(url)<1:
-	STATS("listCategories", "Function")
 	listCategories()
 	
-elif mode==1:
-	STATS("listActiveShows", "Function")
-	listShows(url,u'Aktívne')
-
-elif mode==2:
-	STATS("listArchiveShows", "Function")
-	listShows(url,u'Archív')
-
 elif mode==3:
-	category='/'.join(url.split('/')[-2:])
-	STATS("listEpisodes "+category, "Function")
 	listEpisodes(url)
 
 elif mode==5:
 	playEpisode(url)
-	STATS(name, "Item")
 	sys.exit(0)
 
 xbmcplugin.endOfDirectory(int(sys.argv[1]))
