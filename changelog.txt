@@ -1,3 +1,6 @@
+[B]2019-09-29 v1.0.8:[/B]
+ * Opravene zobrazovanie videi, ktore nemali informaciu o dlzke
+ * Pridany zoznam relacii
 [B]2019-09-29 v1.0.7:[/B]
  * Pridana podpora pre zdroj videa Vimeo
 [B]2019-03-13 v1.0.6:[/B]

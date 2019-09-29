@@ -46,8 +46,11 @@ def addDir(name,url,mode,iconimage,desc):
 	return ok
 
 def getDuration(durstr):
-	x = time.strptime(durstr,'%M:%S')
-	return str(datetime.timedelta(hours=x.tm_hour,minutes=x.tm_min,seconds=x.tm_sec).total_seconds())
+	try:
+		x = time.strptime(durstr,'%M:%S')
+		return str(datetime.timedelta(hours=x.tm_hour,minutes=x.tm_min,seconds=x.tm_sec).total_seconds())
+	except:
+		return "0"
 
 def getDataFromUrl(url):
 	req = urllib2.Request(url)
@@ -66,29 +69,35 @@ def getXmlFromUrl(url):
 def listCategories():
 	logDbg("listCategories()")
 #	addDir(u'[B]Všetky videá[/B]',__baseurl__+'/hs/',3,icon,'')
-	addDir(u'[B]Spravodajstvo[/B]','/r/7026/spravodajstvo.html',3,icon,'')
-	addDir(u'[B]Publicisticka[/B]','/r/7028/publicistika.html',3,icon,'')
-	addDir(u'[B]Zábava[/B]','/r/7031/zabava.html',3,icon,'')
-#	addDir(u'[B]Zoznam relácií (aktívne)[/B]',__baseurl__+'/relacie/',1,icon,'')
-#	addDir(u'[B]Zoznam relácií (archív)[/B]',__baseurl__+'/relacie/',2,icon,'')
+	addDir(u'[B]Spravodajstvo[/B]',__baseurl__+'/r/7026/spravodajstvo.html',3,icon,'')
+	addDir(u'[B]Publicisticka[/B]',__baseurl__+'/r/7028/publicistika.html',3,icon,'')
+	addDir(u'[B]Zábava[/B]',__baseurl__+'/r/7031/zabava.html',3,icon,'')
+	addDir(u'[B]Zoznam relácií[/B]',__baseurl__+'/relacie/',1,icon,'')
+
+def listShows(url):
+	logDbg("listShows()")
+	httpdata = getHtmlFromUrl(url)
+	items = re.compile(u'<div class=\"col-sm col-3-sm px-s px-m-mo\">.+?<a href="(.+?)" title="(.+?)" class="tvshows-item">.+?<img src="(.+?)"', re.DOTALL).findall(httpdata)
+	for link,name,img in items:
+		addDir(name,link,3,img,'')
 
 def listEpisodes(url):
 	logDbg("listEpisodes()")
 	
-	httpdata = getHtmlFromUrl(__baseurl__+url)
+	httpdata = getHtmlFromUrl(url)
 
 	beg_idx=httpdata.find('class="video-row')
 	end_idx=httpdata.find('id="js-paging"')
 	data=httpdata[beg_idx:end_idx]
 	
-	pattern = re.compile('<a data-deep-tags=\"position-[0-9]+\" class=\"video-box-tile\".+?href=\"(.+?)\">.+?<img class=\"video-box-tile-img\" src=\"(.+?)\".+?>.+?<h2.*?>(.+?)</h2>.+?media-box-author(.+?)datetime=\"([0-9]{2}:[0-9]{2})\"', re.DOTALL)
+	pattern = re.compile('data-deep-tags=\"position-[0-9]+\" class=\"video-box-tile\".+?href=\"(.+?)\">.+?<img class=\"video-box-tile-img\" src=\"(.+?)\".+?>.+?<h2.*?>(.+?)</h2>.+?<span class=\"media-box-author.*?>(.+?)</span>.+?(?:(?:<time datetime=\"(.+?)\">)|(?:</a>.+?<a))', re.DOTALL)
 	it = re.finditer(pattern,data)
 	for item in it:
 		link,img,title,authors,duration = item.groups()
 		addLink(title.strip().replace('(video)',''),link,5,img,"",getDuration(duration))
 	nextlink=re.compile('<link rel=\"next\" href=\"(.+?)\">', re.DOTALL).search(httpdata)
 	if nextlink:
-		addDir(u'[B]Nasledujúce články[/B]',nextlink.group(1),3,nexticon,'')
+		addDir(u'[B]Nasledujúce články[/B]',__baseurl__+nextlink.group(1),3,nexticon,'')
 	else:
 		logDbg('No next page.') 
 	return None
@@ -175,7 +184,10 @@ logDbg("Desc: "+str(desc))
 
 if mode==None or url==None or len(url)<1:
 	listCategories()
-	
+
+elif mode==1:
+	listShows(url)
+
 elif mode==3:
 	listEpisodes(url)
 
