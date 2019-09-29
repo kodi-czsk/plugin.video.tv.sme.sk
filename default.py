@@ -22,6 +22,10 @@ def logDbg(msg):
 def logErr(msg):
 	log(msg,level=xbmc.LOGERROR)
 
+def notifyErr(msg, timeout = 7000):
+	xbmc.executebuiltin('Notification(%s, %s, %d, %s)'%(__scriptname__, msg.encode('utf-8'), timeout, __addon__.getAddonInfo('icon')))
+	logErr(msg)
+
 def addLink(name,url,mode,iconimage,desc,duration):
 	logDbg("addLink(): '"+name+"' url='"+url+ "' img='"+iconimage+"' desc='"+desc+"' dur='"+duration+"")
 	u=sys.argv[0]+"?url="+urllib.quote_plus(url.encode('utf-8'))+"&mode="+str(mode)+"&name="+urllib.quote_plus(name.encode('utf-8'))+"&desc="+urllib.quote_plus(desc.encode('utf-8'))
@@ -93,15 +97,24 @@ def getVideoUrl(url):
 	logDbg("getVideoUrl()")
 	logDbg("\tPage url="+url)
 	httpdata = getHtmlFromUrl(url)
-	match = re.compile(r'<iframe src=\"//www\.youtube\.com/embed/(.+?)\"', re.DOTALL).search(httpdata)
+	# try vimeo provider
+	match = re.compile(r'data-direct-source=\"(.+?)"', re.DOTALL).search(httpdata)
 	if match:
-		return 'plugin://plugin.video.youtube/play/?video_id='+match.group(1)
+		logDbg("\tFound Vimeo direct URL: "+match.group(1))
+		return match.group(1)
 	else:
-		match = re.compile(r'<iframe src=\"//(.*?sme\.sk/vp/.+?)\"', re.DOTALL).search(httpdata)
+		# try youtube provider
+		match = re.compile(r'<iframe src=\"//www\.youtube\.com/embed/(.+?)\"', re.DOTALL).search(httpdata)
 		if match:
-			return getVideoUrl('http://'+match.group(1))
+			logDbg("\tFound YouTube video ID: "+match.group(1))
+			return 'plugin://plugin.video.youtube/play/?video_id='+match.group(1)
 		else:
-			logDbg("Iframe youtube not found!")
+			# try youtube provider different way
+			match = re.compile(r'<iframe src=\"//(.*?sme\.sk/vp/.+?)\"', re.DOTALL).search(httpdata)
+			if match:
+				return getVideoUrl('http://'+match.group(1))
+			else:
+				notifyErr(u'Neznámy zdroj videa!')
 	return None
 
 def playEpisode(url):

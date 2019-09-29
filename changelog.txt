@@ -1,3 +1,5 @@
+[B]2019-09-29 v1.0.7:[/B]
+ * Pridana podpora pre zdroj videa Vimeo
 [B]2019-03-13 v1.0.6:[/B]
  * Zakladna oprava prehravania po zmene webu z tv.sme.sk na video.sme.sk
  * Zatial bez zoznamu relacii a najnovsich videi
