@@ -1,3 +1,7 @@
+[B]2019-09-29 v1.0.9:[/B]
+ * Pridane najnovsie videa z RSS zdroja
+ * Opravene strankovanie v niektorych relaciach
+ * Aktualizovany popis doplnku
 [B]2019-09-29 v1.0.8:[/B]
  * Opravene zobrazovanie videi, ktore nemali informaciu o dlzke
  * Pridany zoznam relacii

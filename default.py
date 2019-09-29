@@ -3,6 +3,8 @@ import urllib2,urllib,re,os
 import xbmcplugin,xbmcgui,xbmcaddon
 import datetime
 import time
+import elementtree.ElementTree as ET
+import rfc822
 
 __baseurl__ = 'https://video.sme.sk'
 __addon__ = xbmcaddon.Addon('plugin.video.tv.sme.sk')
@@ -26,12 +28,12 @@ def notifyErr(msg, timeout = 7000):
 	xbmc.executebuiltin('Notification(%s, %s, %d, %s)'%(__scriptname__, msg.encode('utf-8'), timeout, __addon__.getAddonInfo('icon')))
 	logErr(msg)
 
-def addLink(name,url,mode,iconimage,desc,duration):
-	logDbg("addLink(): '"+name+"' url='"+url+ "' img='"+iconimage+"' desc='"+desc+"' dur='"+duration+"")
+def addLink(name,url,mode,iconimage,desc,duration,pub=""):
+	logDbg("addLink(): '"+name+"' url='"+url+ "' img='"+iconimage+"' desc='"+desc+"' dur='"+duration+"' pub='"+pub+"'")
 	u=sys.argv[0]+"?url="+urllib.quote_plus(url.encode('utf-8'))+"&mode="+str(mode)+"&name="+urllib.quote_plus(name.encode('utf-8'))+"&desc="+urllib.quote_plus(desc.encode('utf-8'))
 	ok=True
 	liz=xbmcgui.ListItem(name, iconImage="DefaultVideo.png", thumbnailImage=iconimage)
-	liz.setInfo( type="Video", infoLabels={ "Title": name, "Plot": desc, "Duration": duration} )
+	liz.setInfo( type="Video", infoLabels={ "Title": name, "Plot": desc, "Duration": duration, "dateadded": pub} )
 	liz.setProperty("IsPlayable", "true")
 	ok=xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=False)
 	return ok
@@ -68,11 +70,24 @@ def getXmlFromUrl(url):
 
 def listCategories():
 	logDbg("listCategories()")
-#	addDir(u'[B]Všetky videá[/B]',__baseurl__+'/hs/',3,icon,'')
+	addDir(u'[B]Najnovšie videá[/B]',__baseurl__+'/rss',2,icon,'')
 	addDir(u'[B]Spravodajstvo[/B]',__baseurl__+'/r/7026/spravodajstvo.html',3,icon,'')
 	addDir(u'[B]Publicisticka[/B]',__baseurl__+'/r/7028/publicistika.html',3,icon,'')
 	addDir(u'[B]Zábava[/B]',__baseurl__+'/r/7031/zabava.html',3,icon,'')
 	addDir(u'[B]Zoznam relácií[/B]',__baseurl__+'/relacie/',1,icon,'')
+
+def listLatest(url):
+	logDbg("listLatest()")
+	xml = ET.fromstring(getDataFromUrl(url))
+	for i in xml.find('channel').findall('item'):
+		addLink(i.find('title').text.strip().replace('(video)',''),
+			i.find('link').text,
+			5,
+			i.find('enclosure').attrib['url'],
+			i.find('description').text,
+			"0",
+			time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(rfc822.mktime_tz(rfc822.parsedate_tz(i.find('pubDate').text))))
+			)
 
 def listShows(url):
 	logDbg("listShows()")
@@ -97,7 +112,11 @@ def listEpisodes(url):
 		addLink(title.strip().replace('(video)',''),link,5,img,"",getDuration(duration))
 	nextlink=re.compile('<link rel=\"next\" href=\"(.+?)\">', re.DOTALL).search(httpdata)
 	if nextlink:
-		addDir(u'[B]Nasledujúce články[/B]',__baseurl__+nextlink.group(1),3,nexticon,'')
+		if not nextlink.group(1).startswith('http'):
+			url=__baseurl__+nextlink.group(1)
+		else:
+			url=nextlink.group(1)
+		addDir(u'[B]Nasledujúce články[/B]',url,3,nexticon,'')
 	else:
 		logDbg('No next page.') 
 	return None
@@ -187,6 +206,9 @@ if mode==None or url==None or len(url)<1:
 
 elif mode==1:
 	listShows(url)
+
+elif mode==2:
+	listLatest(url)
 
 elif mode==3:
 	listEpisodes(url)
